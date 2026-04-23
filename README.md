@@ -1,4 +1,4 @@
-# DevTracker — Frontend & Fullstack Learning Tracker
+# CodingZone — Frontend & Fullstack Learning Tracker
 
 An AI-powered personal learning tracker built with React + Vite + TypeScript, deployed on Vercel.
 Tracks your curriculum progress, runs AI-generated exams, simulates job interviews, and gives you
@@ -23,7 +23,7 @@ a real-time Junior / Mid / Senior readiness score.
 
 ```bash
 git clone <your-repo-url>
-cd devtracker
+cd codingzone
 npm install
 ```
 
@@ -86,7 +86,7 @@ Your app is now live at `https://your-project.vercel.app`
 ## Project Structure
 
 ```
-devtracker/
+codingzone/
 ├── api/                    # Vercel serverless functions
 │   ├── exam.ts             # Generate exam questions via Claude
 │   ├── score.ts            # Grade student answers via Claude
@@ -150,7 +150,7 @@ If you want your data to sync across devices (phone + laptop):
 
 ```bash
 # Create a KV store
-vercel kv create devtracker-store
+vercel kv create codingzone-store
 
 # This outputs KV_REST_API_URL and KV_REST_API_TOKEN
 # Add them to your Vercel project env vars

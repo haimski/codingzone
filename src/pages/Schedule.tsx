@@ -83,9 +83,9 @@ export default function Schedule() {
       }
     })
     // Direct localStorage update for simplicity
-    const raw = JSON.parse(localStorage.getItem('devtracker_state') ?? '{}')
+    const raw = JSON.parse(localStorage.getItem('codingzone_state') ?? '{}')
     raw.weekPlans = updatedPlans
-    localStorage.setItem('devtracker_state', JSON.stringify(raw))
+    localStorage.setItem('codingzone_state', JSON.stringify(raw))
     window.location.reload() // simplest way to re-sync state
   }
 

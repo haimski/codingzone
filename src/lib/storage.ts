@@ -1,7 +1,7 @@
 import type { AppState, TopicProgress, ExamSession, WeekPlan, ReadinessScore } from '@/types'
 import { CURRICULUM } from './curriculum'
 
-const KEY = 'devtracker_state'
+const KEY = 'codingzone_state'
 
 export function getDefaultState(): AppState {
   const topicProgress: Record<string, TopicProgress> = {}
