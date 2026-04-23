@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(gh --version)",
-      "Bash(curl -s https://codingzone-black.vercel.app/api/exam -H 'content-type: application/json' --data-raw '{\"topicTitle\":\"ES6+ syntax: destructuring, spread, template literals\",\"topicSection\":\"JavaScript Foundations\",\"phase\":0,\"interviewWeight\":\"high\",\"pastScores\":[],\"targetLevel\":\"junior\"}')"
+      "Bash(curl -s https://codingzone-black.vercel.app/api/exam -H 'content-type: application/json' --data-raw '{\"topicTitle\":\"ES6+ syntax: destructuring, spread, template literals\",\"topicSection\":\"JavaScript Foundations\",\"phase\":0,\"interviewWeight\":\"high\",\"pastScores\":[],\"targetLevel\":\"junior\"}')",
+      "Bash(curl -s https://codingzone-black.vercel.app/api/exam -H 'content-type: application/json' --data-raw '{\"topicTitle\":\"ES6+ syntax: destructuring, spread, template literals\",\"topicSection\":\"JavaScript Foundations\",\"phase\":0,\"interviewWeight\":\"high\",\"pastScores\":[],\"targetLevel\":\"mid\"}')"
     ]
   }
 }
