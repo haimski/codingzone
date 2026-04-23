@@ -74,19 +74,22 @@ Return ONLY valid JSON, no markdown fences:
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1500,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
 
     const data = await response.json()
+    if (!response.ok) {
+      return Response.json({ error: 'Anthropic API error', detail: data }, { status: 502 })
+    }
     const text = data.content?.[0]?.text ?? ''
     const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const parsed = JSON.parse(clean)
     return Response.json(parsed)
   } catch (err) {
     console.error('Exam error:', err)
-    return Response.json({ error: 'Failed to generate questions' }, { status: 500 })
+    return Response.json({ error: 'Failed to generate questions', detail: String(err) }, { status: 500 })
   }
 }
