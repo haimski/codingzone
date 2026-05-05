@@ -29,9 +29,10 @@ export interface ExamQuestion {
   id: string
   type: QuestionType
   question: string
-  codeStarter?: string       // for code challenges
-  gradingCriteria: string[]  // what the AI checks for
-  difficulty: 1 | 2 | 3     // 1=easy 2=medium 3=hard
+  codeStarter?: string
+  modelAnswer?: string
+  gradingCriteria: string[]
+  difficulty: 1 | 2 | 3
   roleLevel: RoleLevel
 }
 

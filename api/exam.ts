@@ -33,6 +33,7 @@ Past exam scores: ${pastScores?.length ? pastScores.join(', ') : 'none yet'}
 Difficulty: ${difficulty}
 
 Generate exactly 3 exam questions. Mix conceptual and code-challenge types.
+Each question must include a modelAnswer: a complete, ideal answer a senior developer would give.
 
 Return ONLY valid JSON, no markdown fences:
 {
@@ -42,6 +43,7 @@ Return ONLY valid JSON, no markdown fences:
       "type": "conceptual",
       "question": "...",
       "codeStarter": "",
+      "modelAnswer": "Complete ideal answer...",
       "gradingCriteria": ["criterion 1", "criterion 2", "criterion 3"],
       "difficulty": 2,
       "roleLevel": "mid"
@@ -51,6 +53,7 @@ Return ONLY valid JSON, no markdown fences:
       "type": "code-challenge",
       "question": "...",
       "codeStarter": "// starter code",
+      "modelAnswer": "// Complete working solution with comments",
       "gradingCriteria": ["criterion 1", "criterion 2"],
       "difficulty": 2,
       "roleLevel": "mid"
@@ -60,6 +63,7 @@ Return ONLY valid JSON, no markdown fences:
       "type": "conceptual",
       "question": "...",
       "codeStarter": "",
+      "modelAnswer": "Complete ideal answer...",
       "gradingCriteria": ["criterion 1", "criterion 2"],
       "difficulty": 3,
       "roleLevel": "senior"
@@ -77,7 +81,7 @@ Return ONLY valid JSON, no markdown fences:
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1500,
+        max_tokens: 2500,
         messages: [{ role: 'user', content: prompt }],
       }),
     })
@@ -95,3 +99,4 @@ Return ONLY valid JSON, no markdown fences:
     return Response.json({ error: 'Failed to generate questions', detail: String(err) }, { status: 500 })
   }
 }
+  

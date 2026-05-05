@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useApp } from '@/lib/context'
 import { CURRICULUM } from '@/lib/curriculum'
@@ -22,10 +22,10 @@ export default function ExamRoom() {
   const [gradingCurrent, setGradingCurrent] = useState(false)
   const [session, setSession] = useState<ExamSession | null>(null)
   const [error, setError] = useState('')
+  const [revealedAnswers, setRevealedAnswers] = useState<boolean[]>([])
 
   const topic = CURRICULUM.find(t => t.id === selectedTopicId)
 
-  // Auto-scroll to top on state change
   useEffect(() => { window.scrollTo(0, 0) }, [examState])
 
   async function startExam() {
@@ -50,6 +50,7 @@ export default function ExamRoom() {
       const data = await res.json()
       setQuestions(data.questions)
       setAnswers(new Array(data.questions.length).fill(''))
+      setRevealedAnswers(new Array(data.questions.length).fill(false))
       setCurrentQ(0)
       setCurrentAnswer('')
       setGradedAnswers([])
@@ -61,13 +62,28 @@ export default function ExamRoom() {
   }
 
   async function submitAnswer() {
-    if (!currentAnswer.trim() || !topic) return
+    if (!topic) return
     const q = questions[currentQ]
     const newAnswers = [...answers]
     newAnswers[currentQ] = currentAnswer
     setAnswers(newAnswers)
-    setGradingCurrent(true)
 
+    // If user revealed the model answer → auto-score 0, skip API
+    if (revealedAnswers[currentQ]) {
+      const graded: ExamAnswer = {
+        questionId: q.id,
+        answer: currentAnswer || '(model answer viewed)',
+        score: 0,
+        feedback: 'Model answer was revealed — score automatically set to 0.',
+        strengths: [],
+        improvements: ['Attempt the question before revealing the answer next time'],
+      }
+      finishQuestion(graded)
+      return
+    }
+
+    if (!currentAnswer.trim()) return
+    setGradingCurrent(true)
     try {
       const res = await fetch('/api/score', {
         method: 'POST',
@@ -89,34 +105,43 @@ export default function ExamRoom() {
         strengths: data.strengths ?? [],
         improvements: data.improvements ?? [],
       }
-      const newGraded = [...gradedAnswers, graded]
-      setGradedAnswers(newGraded)
       setGradingCurrent(false)
-
-      if (currentQ < questions.length - 1) {
-        setCurrentQ(currentQ + 1)
-        setCurrentAnswer('')
-      } else {
-        // All done — build session
-        const overallScore = Math.round(newGraded.reduce((a, g) => a + g.score, 0) / newGraded.length)
-        const newSession: ExamSession = {
-          id: `exam_${Date.now()}`,
-          topicId: topic.id,
-          startedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          questions,
-          answers: newGraded,
-          overallScore,
-          feedback: newGraded.map(g => g.feedback).join(' '),
-        }
-        setSession(newSession)
-        dispatch({ type: 'ADD_EXAM', session: newSession })
-        setExamState('results')
-      }
+      finishQuestion(graded)
     } catch {
       setGradingCurrent(false)
       setError('Failed to grade answer — try again')
     }
+  }
+
+  function finishQuestion(graded: ExamAnswer) {
+    const newGraded = [...gradedAnswers, graded]
+    setGradedAnswers(newGraded)
+
+    if (currentQ < questions.length - 1) {
+      setCurrentQ(currentQ + 1)
+      setCurrentAnswer('')
+    } else {
+      const overallScore = Math.round(newGraded.reduce((a, g) => a + g.score, 0) / newGraded.length)
+      const newSession: ExamSession = {
+        id: `exam_${Date.now()}`,
+        topicId: topic!.id,
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        questions,
+        answers: newGraded,
+        overallScore,
+        feedback: newGraded.map(g => g.feedback).join(' '),
+      }
+      setSession(newSession)
+      dispatch({ type: 'ADD_EXAM', session: newSession })
+      setExamState('results')
+    }
+  }
+
+  function revealAnswer(index: number) {
+    const next = [...revealedAnswers]
+    next[index] = true
+    setRevealedAnswers(next)
   }
 
   // ── Select screen ────────────────────────────────────────────────────────────
@@ -132,7 +157,6 @@ export default function ExamRoom() {
 
         {error && <div style={{ marginBottom: 20, padding: '12px 16px', background: '#FF6B6B18', border: '1px solid #FF6B6B40', borderRadius: 10, color: '#FF6B6B', fontSize: 13 }}>{error}</div>}
 
-        {/* Topic selector */}
         <label style={{ display: 'block', fontSize: 12, color: '#9090A8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
           Select a topic
         </label>
@@ -156,7 +180,6 @@ export default function ExamRoom() {
           ))}
         </select>
 
-        {/* Level selector */}
         <label style={{ display: 'block', fontSize: 12, color: '#9090A8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
           Target role level
         </label>
@@ -174,7 +197,6 @@ export default function ExamRoom() {
           ))}
         </div>
 
-        {/* Topic preview */}
         {topic && (
           <div style={{ background: '#1A1A1F', border: '1px solid #2E2E3A', borderRadius: 12, padding: 20, marginBottom: 24 }}>
             <div style={{ fontSize: 11, color: '#9090A8', marginBottom: 4 }}>{topic.section}</div>
@@ -223,7 +245,10 @@ export default function ExamRoom() {
   // ── Answering screen ─────────────────────────────────────────────────────────
   if (examState === 'answering') {
     const q = questions[currentQ]
-    const progress = ((currentQ) / questions.length) * 100
+    const isCodeChallenge = q.type === 'code-challenge'
+    const isRevealed = revealedAnswers[currentQ]
+    const canSubmit = (isRevealed || currentAnswer.trim().length > 0) && !gradingCurrent
+    const progress = (currentQ / questions.length) * 100
 
     return (
       <div style={{ padding: '32px 36px', maxWidth: 760, margin: '0 auto', animation: 'fadeIn 0.3s ease' }}>
@@ -260,8 +285,8 @@ export default function ExamRoom() {
           )}
         </div>
 
-        {/* Grading criteria (hint) */}
-        <div style={{ marginBottom: 16 }}>
+        {/* Grading criteria */}
+        <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: 11, color: '#6060A8', marginBottom: 8 }}>What a great answer includes:</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {q.gradingCriteria.map((c, i) => (
@@ -272,33 +297,72 @@ export default function ExamRoom() {
           </div>
         </div>
 
-        {/* Answer textarea */}
-        <textarea
-          value={currentAnswer}
-          onChange={e => setCurrentAnswer(e.target.value)}
-          placeholder={q.type === 'code-challenge' ? 'Write your code solution here...' : 'Type your answer here...'}
-          style={{
-            width: '100%', minHeight: q.type === 'code-challenge' ? 240 : 160,
-            padding: '14px 16px', background: '#1A1A1F', border: '1px solid #2E2E3A',
-            borderRadius: 10, color: '#E8E8F0', fontSize: q.type === 'code-challenge' ? 13 : 14,
-            fontFamily: q.type === 'code-challenge' ? 'JetBrains Mono, monospace' : 'DM Sans, sans-serif',
-            outline: 'none', resize: 'vertical', lineHeight: 1.6, marginBottom: 16,
-          }}
-          onFocus={e => (e.target.style.borderColor = '#C8FF00')}
-          onBlur={e => (e.target.style.borderColor = '#2E2E3A')}
-        />
+        {/* Answer input */}
+        {isCodeChallenge
+          ? <CodeEditor value={currentAnswer} onChange={setCurrentAnswer} disabled={isRevealed} />
+          : (
+            <textarea
+              value={currentAnswer}
+              onChange={e => setCurrentAnswer(e.target.value)}
+              disabled={isRevealed}
+              placeholder="Type your answer here..."
+              style={{
+                width: '100%', minHeight: 160, padding: '14px 16px',
+                background: isRevealed ? '#111115' : '#1A1A1F',
+                border: '1px solid #2E2E3A', borderRadius: 10,
+                color: isRevealed ? '#4A4A5A' : '#E8E8F0', fontSize: 14,
+                fontFamily: 'DM Sans, sans-serif', outline: 'none',
+                resize: 'vertical', lineHeight: 1.6, marginBottom: 16,
+                cursor: isRevealed ? 'not-allowed' : 'text',
+              }}
+              onFocus={e => { if (!isRevealed) e.target.style.borderColor = '#C8FF00' }}
+              onBlur={e => (e.target.style.borderColor = '#2E2E3A')}
+            />
+          )
+        }
+
+        {/* Model answer reveal */}
+        {!isRevealed && q.modelAnswer && (
+          <button
+            onClick={() => revealAnswer(currentQ)}
+            style={{
+              width: '100%', padding: '10px', marginBottom: 16,
+              background: 'transparent', border: '1px solid #FF6B6B30',
+              borderRadius: 10, color: '#FF6B6B80', fontSize: 12,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#FF6B6B60'; e.currentTarget.style.color = '#FF6B6B' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#FF6B6B30'; e.currentTarget.style.color = '#FF6B6B80' }}
+          >
+            ⚠️ Reveal model answer — this question will score 0
+          </button>
+        )}
+
+        {/* Model answer shown after reveal */}
+        {isRevealed && q.modelAnswer && (
+          <div style={{ marginBottom: 16, border: '1px solid #FF6B6B40', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ padding: '8px 14px', background: '#FF6B6B15', borderBottom: '1px solid #FF6B6B30', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#FF6B6B', fontWeight: 600 }}>Model answer — score: 0</span>
+            </div>
+            <pre style={{ margin: 0, padding: '14px 16px', background: '#0D0D0F', fontSize: 13, color: '#9090A8', fontFamily: isCodeChallenge ? 'JetBrains Mono, monospace' : 'DM Sans, sans-serif', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+              {q.modelAnswer}
+            </pre>
+          </div>
+        )}
 
         {error && <div style={{ marginBottom: 12, color: '#FF6B6B', fontSize: 13 }}>{error}</div>}
 
         <button
-          disabled={!currentAnswer.trim() || gradingCurrent}
+          disabled={!canSubmit}
           onClick={submitAnswer}
           style={{
-            width: '100%', padding: '13px', background: currentAnswer.trim() && !gradingCurrent ? '#C8FF00' : '#2A2A32',
-            color: currentAnswer.trim() && !gradingCurrent ? '#0D0D0F' : '#6060A8',
-            border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: currentAnswer.trim() && !gradingCurrent ? 'pointer' : 'not-allowed',
+            width: '100%', padding: '13px',
+            background: canSubmit ? (isRevealed ? '#FF6B6B' : '#C8FF00') : '#2A2A32',
+            color: canSubmit ? '#0D0D0F' : '#6060A8',
+            border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
+            cursor: canSubmit ? 'pointer' : 'not-allowed',
           }}>
-          {gradingCurrent ? 'Grading your answer...' : currentQ < questions.length - 1 ? 'Submit & next question →' : 'Submit & see results →'}
+          {gradingCurrent ? 'Grading your answer...' : isRevealed ? 'Continue (score: 0) →' : currentQ < questions.length - 1 ? 'Submit & next question →' : 'Submit & see results →'}
         </button>
       </div>
     )
@@ -311,7 +375,6 @@ export default function ExamRoom() {
 
     return (
       <div style={{ padding: '32px 36px', maxWidth: 760, margin: '0 auto', animation: 'fadeIn 0.4s ease' }}>
-        {/* Score banner */}
         <div style={{ background: '#1A1A1F', border: `1px solid ${scoreColor}40`, borderRadius: 16, padding: '32px', textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 64, fontWeight: 800, color: scoreColor, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>
             {session.overallScore}
@@ -320,7 +383,6 @@ export default function ExamRoom() {
           <div style={{ fontSize: 13, color: '#9090A8', marginTop: 8 }}>{topic?.title}</div>
         </div>
 
-        {/* Per-question breakdown */}
         <h2 style={{ fontSize: 13, color: '#9090A8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 14 }}>
           Question breakdown
         </h2>
@@ -358,7 +420,6 @@ export default function ExamRoom() {
           })}
         </div>
 
-        {/* Actions */}
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={() => { setExamState('select'); setSession(null) }} style={{ flex: 1, padding: '13px', background: '#C8FF00', color: '#0D0D0F', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             Take another exam
@@ -373,6 +434,63 @@ export default function ExamRoom() {
 
   return null
 }
+
+// ── Code Editor component ─────────────────────────────────────────────────────
+
+function CodeEditor({ value, onChange, disabled = false }: {
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const el = e.currentTarget
+      const start = el.selectionStart
+      const end = el.selectionEnd
+      const newVal = value.substring(0, start) + '  ' + value.substring(end)
+      onChange(newVal)
+      setTimeout(() => {
+        if (ref.current) {
+          ref.current.selectionStart = ref.current.selectionEnd = start + 2
+        }
+      }, 0)
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 16, border: `1px solid ${disabled ? '#2E2E3A' : '#3A3A4A'}`, borderRadius: 10, overflow: 'hidden', background: '#0D0D0F' }}>
+      {/* Window chrome */}
+      <div style={{ padding: '8px 14px', background: '#111115', borderBottom: '1px solid #2E2E3A', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F57', display: 'block' }} />
+        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FFBD2E', display: 'block' }} />
+        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28CA41', display: 'block' }} />
+        <span style={{ marginLeft: 8, fontSize: 11, color: '#3A3A55', fontFamily: 'JetBrains Mono, monospace' }}>solution.js</span>
+      </div>
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={disabled}
+        placeholder="// Write your solution here..."
+        spellCheck={false}
+        style={{
+          width: '100%', minHeight: 260, padding: '16px',
+          background: 'transparent', border: 'none', outline: 'none',
+          resize: 'vertical', color: disabled ? '#4A4A5A' : '#A78BFA',
+          fontSize: 13, fontFamily: 'JetBrains Mono, monospace',
+          lineHeight: 1.7, boxSizing: 'border-box',
+          cursor: disabled ? 'not-allowed' : 'text',
+        }}
+      />
+    </div>
+  )
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const LEVEL_COLORS: Record<string, string> = { junior: '#A78BFA', mid: '#60CFFF', senior: '#C8FF00' }
 const TYPE_COLORS: Record<string, string> = { conceptual: '#60CFFF', 'code-challenge': '#C8FF00', 'system-design': '#FF6B6B' }

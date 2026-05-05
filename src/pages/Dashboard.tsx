@@ -18,6 +18,13 @@ export default function Dashboard() {
     'senior':  { color: '#C8FF00', label: 'Senior-ready',   sub: 'Apply confidently to senior & fullstack roles' },
   }[verdict]
 
+  const medal = {
+    'not-yet': null,
+    'junior':  { emoji: '🥉', label: 'Bronze Medal', color: '#CD7F32' },
+    'mid':     { emoji: '🥈', label: 'Silver Medal', color: '#C0C0C0' },
+    'senior':  { emoji: '🥇', label: 'Gold Medal',   color: '#FFD700' },
+  }[verdict]
+
   const phaseStats = useMemo(() => [0, 1, 2].map(phase => {
     const topics = CURRICULUM.filter(t => t.phase === phase)
     const done = topics.filter(t => topicProgress[t.id]?.completed).length
@@ -41,13 +48,33 @@ export default function Dashboard() {
     <div style={{ padding: '32px 36px', maxWidth: 960, margin: '0 auto', animation: 'fadeIn 0.4s ease' }}>
 
       {/* Header */}
-      <div style={{ marginBottom: 36 }}>
+      <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontFamily: 'DM Serif Display, serif', fontSize: 32, color: '#E8E8F0', margin: 0, letterSpacing: '-0.5px' }}>
           Your progress
         </h1>
         <p style={{ color: '#9090A8', marginTop: 6, fontSize: 14 }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
+      </div>
+
+      {/* Level banner */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24,
+        padding: '16px 20px', borderRadius: 14,
+        background: `${verdictConfig.color}10`, border: `1px solid ${verdictConfig.color}30`,
+      }}>
+        {medal && <span style={{ fontSize: 36, lineHeight: 1 }}>{medal.emoji}</span>}
+        {!medal && <span style={{ fontSize: 28, lineHeight: 1 }}>📚</span>}
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: verdictConfig.color }}>{verdictConfig.label}</div>
+          <div style={{ fontSize: 13, color: '#9090A8', marginTop: 2 }}>{verdictConfig.sub}</div>
+        </div>
+        {medal && (
+          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: medal.color }}>{medal.label}</div>
+            <div style={{ fontSize: 11, color: '#6060A8', marginTop: 2 }}>earned</div>
+          </div>
+        )}
       </div>
 
       {/* Top row: big score + verdict */}
@@ -78,6 +105,12 @@ export default function Dashboard() {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: verdictConfig.color }}>{verdictConfig.label}</div>
             <div style={{ fontSize: 12, color: '#9090A8', marginTop: 4, lineHeight: 1.4 }}>{verdictConfig.sub}</div>
+            {medal && (
+              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 32 }}>{medal.emoji}</span>
+                <span style={{ fontSize: 11, color: medal.color, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{medal.label}</span>
+              </div>
+            )}
           </div>
         </div>
 
